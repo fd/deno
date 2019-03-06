@@ -38,6 +38,18 @@ def test_no_color(deno_exe):
     print green_ok()
 
 
+def test_http_proxy(deno_exe):
+    sys.stdout.write("http_proxy test...")
+    sys.stdout.flush()
+    t = os.path.join(tests_path, "http_proxy.js")
+    output = run_output([deno_exe, t, "--allow-net"], merge_env={"http_proxy": "http://localhost:4000"})
+    assert output.strip() == "import: from proxy, fetch: from proxy"
+    t = os.path.join(tests_path, "http_proxy.js")
+    output = run_output([deno_exe, t, "--allow-net"], merge_env={"http_proxy": "http://localhost:4000"})
+    assert output.strip() == "import: direct, fetch: direct"
+    print green_ok()
+
+
 def exec_path_test(deno_exe):
     cmd = [deno_exe, "tests/exec_path.ts"]
     output = run_output(cmd)
@@ -113,6 +125,7 @@ def main(argv):
     deno_dir_test(deno_exe, deno_dir)
 
     test_no_color(deno_exe)
+    test_http_proxy(deno_exe)
 
 
 if __name__ == '__main__':

@@ -8,16 +8,64 @@ use futures::{future, Future, Stream};
 use hyper;
 use hyper::client::{Client, HttpConnector};
 use hyper::header::CONTENT_TYPE;
+use hyper::Request;
 use hyper::Uri;
+use hyper_proxy::{Intercept, Proxy, ProxyConnector};
 use hyper_rustls;
 
-type Connector = hyper_rustls::HttpsConnector<HttpConnector>;
+type InnerConnector = hyper_rustls::HttpsConnector<HttpConnector>;
+type Connector = ProxyConnector<InnerConnector>;
 
 lazy_static! {
   static ref CONNECTOR: Connector = {
     let num_dns_threads = 4;
-    Connector::new(num_dns_threads)
+    let inner = InnerConnector::new(num_dns_threads);
+    let mut outer = Connector::unsecured(inner);
+
+    // if let Ok(list) = env_var("no_proxy") {
+    //   if list == "*" {
+    //     let proxy_uri = ("http://example.com").parse().unwrap();
+    //     outer.add_proxy(Proxy::new(Intercept::None, proxy_uri));
+    //   } else {
+    //
+    //   }
+    // }
+
+    // Only lowercase according to curl
+    if let Ok(target) = std::env::var("http_proxy") {
+      let proxy_uri = target.parse().unwrap();
+      outer.add_proxy(Proxy::new(Intercept::Http, proxy_uri));
+    }
+
+    if let Ok(target) = env_var("https_proxy") {
+      let proxy_uri = target.parse().unwrap();
+      outer.add_proxy(Proxy::new(Intercept::Https, proxy_uri));
+    }
+
+    if let Ok(target) = env_var("all_proxy") {
+      let proxy_uri = target.parse().unwrap();
+      outer.add_proxy(Proxy::new(Intercept::All, proxy_uri));
+    }
+
+    return outer;
   };
+}
+
+fn env_var(key: &str) -> Result<String, std::env::VarError> {
+  match std::env::var(key.to_lowercase()) {
+    Ok(target) => Ok(target),
+    Err(err) => match std::env::var(key.to_uppercase()) {
+      Ok(target) => Ok(target),
+      Err(_) => Err(err),
+    },
+  }
+}
+
+// Add headers for HTTP requests when proxied
+pub fn add_proxy_headers<T>(req: &mut Request<T>) {
+  if let Some(headers) = CONNECTOR.http_headers(req.uri()) {
+    req.headers_mut().extend(headers.clone().into_iter());
+  }
 }
 
 pub fn get_client() -> Client<Connector, hyper::Body> {
@@ -61,8 +109,13 @@ pub fn fetch_sync_string(module_name: &str) -> DenoResult<(String, String)> {
   // TODO(kevinkassimo): consider set a max redirection counter
   // to avoid bouncing between 2 or more urls
   let fetch_future = loop_fn((client, url), |(client, url)| {
+    let body = hyper::body::Body::default();
+    let mut req = Request::new(body);
+    *req.uri_mut() = url.clone();
+    add_proxy_headers(&mut req);
+
     client
-      .get(url.clone())
+      .request(req)
       .map_err(DenoError::from)
       .and_then(move |response| {
         if response.status().is_redirection() {
@@ -85,7 +138,8 @@ pub fn fetch_sync_string(module_name: &str) -> DenoResult<(String, String)> {
         }
         Ok(Loop::Break(response))
       })
-  }).and_then(|response| {
+  })
+  .and_then(|response| {
     let content_type = response
       .headers()
       .get(CONTENT_TYPE)
@@ -96,7 +150,8 @@ pub fn fetch_sync_string(module_name: &str) -> DenoResult<(String, String)> {
       .map(|body| String::from_utf8(body.to_vec()).unwrap())
       .map_err(DenoError::from);
     body.join(future::ok(content_type))
-  }).and_then(|(body_string, maybe_content_type)| {
+  })
+  .and_then(|(body_string, maybe_content_type)| {
     future::ok((body_string, maybe_content_type.unwrap()))
   });
 

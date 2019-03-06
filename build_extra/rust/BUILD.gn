@@ -105,6 +105,23 @@ rust_crate("cfg_if") {
   ]
 }
 
+rust_crate("chrono") {
+  edition = "2015"
+  source_root = "$cargo_home/registry/src/github.com-1ecc6299db9ec823/chrono-0.4.6/src/lib.rs"
+  features = [
+    "default",
+  ]
+  extern = [
+    ":num_integer",
+    ":num_traits",
+    ":time",
+  ]
+  args = [
+    "--cap-lints",
+    "allow",
+  ]
+}
+
 rust_crate("crossbeam") {
   edition = "2015"
   source_root = "$cargo_home/registry/src/github.com-1ecc6299db9ec823/crossbeam-0.6.0/src/lib.rs"
@@ -377,6 +394,24 @@ rust_crate("hyper") {
   ]
 }
 
+rust_crate("hyper_proxy") {
+  edition = "2015"
+  source_root = "$cargo_home/registry/src/github.com-1ecc6299db9ec823/hyper-proxy-0.5.0/src/lib.rs"
+  features = []
+  extern = [
+   ":bytes",
+   ":futures",
+   ":http",
+   ":hyper",
+   ":tokio_io",
+   ":typed_headers",
+  ]
+  args = [
+    "--cap-lints",
+    "allow",
+  ]
+}
+
 rust_crate("hyper_rustls") {
   edition = "2015"
   source_root = "$cargo_home/registry/src/github.com-1ecc6299db9ec823/hyper-rustls-0.16.0/src/lib.rs"
@@ -570,6 +605,18 @@ rust_crate("memoffset") {
   ]
 }
 
+rust_crate("mime") {
+  edition = "2015"
+  source_root = "$cargo_home/registry/src/github.com-1ecc6299db9ec823/mime-0.3.13/src/lib.rs"
+  extern = [
+    ":unicase",
+  ]
+  args = [
+    "--cap-lints",
+    "allow",
+  ]
+}
+
 rust_crate("mio") {
   edition = "2015"
   source_root = "$cargo_home/registry/src/github.com-1ecc6299db9ec823/mio-0.6.16/src/lib.rs"
@@ -639,6 +686,26 @@ rust_crate("num_cpus") {
   edition = "2015"
   source_root = "$cargo_home/registry/src/github.com-1ecc6299db9ec823/num_cpus-1.10.0/src/lib.rs"
   extern = [ ":libc" ]
+  args = [
+    "--cap-lints",
+    "allow",
+  ]
+}
+
+rust_crate("num_integer") {
+  edition = "2015"
+  source_root = "$cargo_home/registry/src/github.com-1ecc6299db9ec823/num-integer-0.1.39/src/lib.rs"
+  features = [ "default" ]
+  extern = [ ":num_traits" ]
+  args = [
+    "--cap-lints",
+    "allow",
+  ]
+}
+
+rust_crate("num_traits") {
+  edition = "2015"
+  source_root = "$cargo_home/registry/src/github.com-1ecc6299db9ec823/num-traits-0.2.6/src/lib.rs"
   args = [
     "--cap-lints",
     "allow",
@@ -1586,9 +1653,37 @@ rust_crate("try_lock") {
   ]
 }
 
+rust_crate("typed_headers") {
+  edition = "2015"
+  source_root = "$cargo_home/registry/src/github.com-1ecc6299db9ec823/typed-headers-0.1.0/src/lib.rs"
+  extern = [
+    ":base64",
+    ":bytes",
+    ":chrono",
+    ":http",
+    ":mime",
+  ]
+  args = [
+    "--cap-lints",
+    "allow",
+  ]
+}
+
 rust_crate("ucd_util") {
   edition = "2015"
   source_root = "$cargo_home/registry/src/github.com-1ecc6299db9ec823/ucd-util-0.1.3/src/lib.rs"
+  args = [
+    "--cap-lints",
+    "allow",
+  ]
+}
+
+rust_crate("unicase") {
+  edition = "2015"
+  source_root = "$cargo_home/registry/src/github.com-1ecc6299db9ec823/unicase-2.3.0/src/lib.rs"
+  extern = [
+    ":version_check",
+  ]
   args = [
     "--cap-lints",
     "allow",
@@ -1661,6 +1756,15 @@ rust_crate("url") {
 rust_crate("utf8_ranges") {
   edition = "2015"
   source_root = "$cargo_home/registry/src/github.com-1ecc6299db9ec823/utf8-ranges-1.0.2/src/lib.rs"
+  args = [
+    "--cap-lints",
+    "allow",
+  ]
+}
+
+rust_crate("version_check") {
+  edition = "2015"
+  source_root = "$cargo_home/registry/src/github.com-1ecc6299db9ec823/version_check-0.1.5/src/lib.rs"
   args = [
     "--cap-lints",
     "allow",
