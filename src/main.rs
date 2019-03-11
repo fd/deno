@@ -91,8 +91,9 @@ fn main() {
     flags.allow_write = true;
   }
 
-  let should_prefetch = flags.prefetch || flags.info;
+  let should_prefetch = flags.prefetch || flags.info || flags.dep_types;
   let should_display_info = flags.info;
+  let should_display_dep_types = flags.dep_types;
 
   let state = Arc::new(isolate::IsolateState::new(flags, rest_argv, None));
   let isolate_init = isolate_init::deno_isolate_init();
@@ -116,6 +117,15 @@ fn main() {
       if should_display_info {
         // Display file info and exit. Do not run file
         modules::print_file_info(
+          &isolate.modules.borrow(),
+          &isolate.state.dir,
+          main_module,
+        );
+        std::process::exit(0);
+      }
+      if should_display_dep_types {
+        // Display dependency declarations and exit. Do not run file
+        modules::print_dep_types(
           &isolate.modules.borrow(),
           &isolate.state.dir,
           main_module,

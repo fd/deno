@@ -113,6 +113,9 @@ export const foo = "bar";
 //# sourceMappingURL=bar.js.map
 //# sourceURL=/root/project/foo/bar.ts`;
 
+const fooBarDTsOutput = `import * as deno from "deno";
+declare export const foo = "bar";`;
+
 const fooBarTsSourcemap = `{"version":3,"file":"bar.js","sourceRoot":"","sources":["file:///root/project/foo/bar.ts"],"names":[],"mappings":"AAAA,OAAO,KAAK,IAAI,MAAM,MAAM,CAAC;AAC7B,OAAO,CAAC,GAAG,CAAC,IAAI,CAAC,CAAC;AAClB,MAAM,CAAC,MAAM,GAAG,GAAG,KAAK,CAAC"}`;
 
 const loadConfigSource = `import * as config from "./config.json";
@@ -403,6 +406,7 @@ test(function compilerCompile() {
   );
   assertEquals(moduleMetaData.sourceCode, fooBarTsSource);
   assertEquals(moduleMetaData.outputCode, fooBarTsOutput);
+  assertEquals(moduleMetaData.declation, fooBarDTsOutput);
 
   assertEquals(
     codeFetchStack.length,

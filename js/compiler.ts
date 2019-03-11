@@ -41,6 +41,8 @@ type OutputCode = string;
 type SourceCode = string;
 /** The output source map */
 type SourceMap = string;
+/** The output declaration file */
+type Declation = string;
 
 /** The format of the work message payload coming from the privileged side */
 interface CompilerLookup {
@@ -79,7 +81,8 @@ class ModuleMetaData implements ts.IScriptSnapshot {
     public readonly mediaType: msg.MediaType,
     public readonly sourceCode: SourceCode = "",
     public outputCode: OutputCode = "",
-    public sourceMap: SourceMap = ""
+    public sourceMap: SourceMap = "",
+    public declaration: Declation = ""
   ) {
     if (outputCode !== "" || fileName.endsWith(".d.ts")) {
       this.scriptVersion = "1";
@@ -159,6 +162,7 @@ class Compiler implements ts.LanguageServiceHost, ts.FormatDiagnosticsHost {
     allowJs: true,
     allowNonTsExtensions: true,
     checkJs: true,
+    declaration: true,
     esModuleInterop: true,
     module: ts.ModuleKind.ESNext,
     outDir: "$deno$",
@@ -310,7 +314,7 @@ class Compiler implements ts.LanguageServiceHost, ts.FormatDiagnosticsHost {
   compile(
     moduleSpecifier: ModuleSpecifier,
     containingFile: ContainingFile
-  ): { outputCode: OutputCode; sourceMap: SourceMap } {
+  ): { outputCode: OutputCode; sourceMap: SourceMap; declaration: Declation } {
     this._log("compiler.compile", { moduleSpecifier, containingFile });
     const moduleMetaData = this._resolveModule(moduleSpecifier, containingFile);
     const { fileName, mediaType, moduleId, sourceCode } = moduleMetaData;
@@ -318,6 +322,7 @@ class Compiler implements ts.LanguageServiceHost, ts.FormatDiagnosticsHost {
     console.warn("Compiling", moduleId);
     let outputCode: string;
     let sourceMap = "";
+    let declaration = "";
     // Instead of using TypeScript to transpile JSON modules, we will just do
     // it directly.
     if (mediaType === msg.MediaType.Json) {
@@ -342,7 +347,8 @@ class Compiler implements ts.LanguageServiceHost, ts.FormatDiagnosticsHost {
         // so we will ignore complaints about this compiler setting.
         ...service
           .getCompilerOptionsDiagnostics()
-          .filter(diagnostic => diagnostic.code !== 5070),
+          .filter(diagnostic => diagnostic.code !== 5070)
+          .filter(diagnostic => diagnostic.code !== 5053),
         ...service.getSyntacticDiagnostics(fileName),
         ...service.getSemanticDiagnostics(fileName)
       ];
@@ -362,11 +368,13 @@ class Compiler implements ts.LanguageServiceHost, ts.FormatDiagnosticsHost {
       );
 
       assert(
-        output.outputFiles.length === 2,
-        `Expected 2 files to be emitted, got ${output.outputFiles.length}.`
+        mediaType === msg.MediaType.TypeScript
+          ? output.outputFiles.length === 3
+          : output.outputFiles.length === 2,
+        `Expected 3 files to be emitted, got ${output.outputFiles.length}.`
       );
 
-      const [sourceMapFile, outputFile] = output.outputFiles;
+      const [sourceMapFile, outputFile, declarationFile] = output.outputFiles;
       assert(
         sourceMapFile.name.endsWith(".map"),
         "Expected first emitted file to be a source map"
@@ -375,14 +383,25 @@ class Compiler implements ts.LanguageServiceHost, ts.FormatDiagnosticsHost {
         outputFile.name.endsWith(".js"),
         "Expected second emitted file to be JavaScript"
       );
+      if (mediaType === msg.MediaType.TypeScript) {
+        assert(
+          declarationFile.name.endsWith(".d.ts"),
+          "Expected third emitted file to be a declaration file"
+        );
+      }
       outputCode = moduleMetaData.outputCode = `${
         outputFile.text
       }\n//# sourceURL=${fileName}`;
       sourceMap = moduleMetaData.sourceMap = sourceMapFile.text;
+      if (mediaType === msg.MediaType.TypeScript) {
+        declaration = moduleMetaData.declaration = declarationFile.text;
+      } else {
+        declaration = moduleMetaData.declaration = "";
+      }
     }
 
     moduleMetaData.scriptVersion = "1";
-    return { outputCode, sourceMap };
+    return { outputCode, sourceMap, declaration };
   }
 
   // TypeScript Language Service and Format Diagnostic Host API

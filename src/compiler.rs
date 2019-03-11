@@ -32,6 +32,8 @@ pub struct ModuleMetaData {
   pub maybe_output_code: Option<Vec<u8>>,
   pub maybe_source_map_filename: Option<String>,
   pub maybe_source_map: Option<Vec<u8>>,
+  pub maybe_declaration_filename: Option<String>,
+  pub maybe_declaration: Option<Vec<u8>>,
 }
 
 impl ModuleMetaData {
@@ -113,6 +115,11 @@ pub fn compile_sync(
         _ => None,
       },
       maybe_source_map_filename: None,
+      maybe_declaration: match map["declaration"].as_str() {
+        Some(str) => Some(str.as_bytes().to_owned()),
+        _ => None,
+      },
+      maybe_declaration_filename: None,
     },
     _ => panic!("error decoding compiler response"),
   }
@@ -139,6 +146,8 @@ mod tests {
       maybe_output_code: None,
       maybe_source_map_filename: None,
       maybe_source_map: None,
+      maybe_declaration_filename: None,
+      maybe_declaration: None,
     };
 
     out = compile_sync(&IsolateState::mock(), specifier, &referrer, &mut out);

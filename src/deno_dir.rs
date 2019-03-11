@@ -108,11 +108,12 @@ impl DenoDir {
     self: &Self,
     filename: &str,
     source_code: &[u8],
-  ) -> (PathBuf, PathBuf) {
+  ) -> (PathBuf, PathBuf, PathBuf) {
     let cache_key = source_code_hash(filename, source_code, version::DENO);
     (
       self.gen.join(cache_key.to_string() + ".js"),
       self.gen.join(cache_key.to_string() + ".js.map"),
+      self.gen.join(cache_key.to_string() + ".d.ts"),
     )
   }
 
@@ -120,8 +121,9 @@ impl DenoDir {
     self: &Self,
     filename: &str,
     source_code: &[u8],
-  ) -> Result<(Vec<u8>, Vec<u8>), std::io::Error> {
-    let (output_code, source_map) = self.cache_path(filename, source_code);
+  ) -> Result<(Vec<u8>, Vec<u8>, Option<Vec<u8>>), std::io::Error> {
+    let (output_code, source_map, declaration) =
+      self.cache_path(filename, source_code);
     debug!(
       "load_cache code: {} map: {}",
       output_code.display(),
@@ -129,14 +131,15 @@ impl DenoDir {
     );
     let read_output_code = fs::read(&output_code)?;
     let read_source_map = fs::read(&source_map)?;
-    Ok((read_output_code, read_source_map))
+    let read_declaration = fs::read(&declaration).ok();
+    Ok((read_output_code, read_source_map, read_declaration))
   }
 
   pub fn code_cache(
     self: &Self,
     module_meta_data: &ModuleMetaData,
   ) -> std::io::Result<()> {
-    let (cache_path, source_map_path) = self
+    let (cache_path, source_map_path, declaration_path) = self
       .cache_path(&module_meta_data.filename, &module_meta_data.source_code);
     // TODO(ry) This is a race condition w.r.t to exists() -- probably should
     // create the file in exclusive mode. A worry is what might happen is there
@@ -151,6 +154,10 @@ impl DenoDir {
       }?;
       match &module_meta_data.maybe_source_map {
         Some(source_map) => fs::write(source_map_path, source_map),
+        _ => Ok(()),
+      }?;
+      match &module_meta_data.maybe_declaration {
+        Some(declaration) => fs::write(declaration_path, declaration),
         _ => Ok(()),
       }?;
       Ok(())
@@ -202,6 +209,8 @@ impl DenoDir {
         maybe_output_code: None,
         maybe_source_map_filename: None,
         maybe_source_map: None,
+        maybe_declaration_filename: None,
+        maybe_declaration: None,
       }));
     } else {
       eprintln!(" NOT FOUND");
@@ -243,6 +252,8 @@ impl DenoDir {
       maybe_output_code: None,
       maybe_source_map_filename: None,
       maybe_source_map: None,
+      maybe_declaration_filename: None,
+      maybe_declaration: None,
     }))
   }
 
@@ -334,10 +345,14 @@ impl DenoDir {
       return Ok(out);
     }
 
-    let (output_code_filename, output_source_map_filename) =
-      self.cache_path(&out.filename, &out.source_code);
+    let (
+      output_code_filename,
+      output_source_map_filename,
+      output_declaration_filename,
+    ) = self.cache_path(&out.filename, &out.source_code);
     let mut maybe_output_code = None;
     let mut maybe_source_map = None;
+    let mut maybe_declaration = None;
 
     if !self.recompile {
       let result = self.load_cache(out.filename.as_str(), &out.source_code);
@@ -349,9 +364,10 @@ impl DenoDir {
             return Err(err.into());
           }
         }
-        Ok((output_code, source_map)) => {
+        Ok((output_code, source_map, declaration)) => {
           maybe_output_code = Some(output_code);
           maybe_source_map = Some(source_map);
+          maybe_declaration = declaration;
         }
       }
     }
@@ -369,6 +385,10 @@ impl DenoDir {
         .to_str()
         .map(String::from),
       maybe_source_map,
+      maybe_declaration_filename: output_declaration_filename
+        .to_str()
+        .map(String::from),
+      maybe_declaration,
     })
   }
 
@@ -639,7 +659,8 @@ mod tests {
     assert_eq!(
       (
         temp_dir.path().join(format!("gen/{}.js", hash)),
-        temp_dir.path().join(format!("gen/{}.js.map", hash))
+        temp_dir.path().join(format!("gen/{}.js.map", hash)),
+        temp_dir.path().join(format!("gen/{}.d.ts", hash))
       ),
       deno_dir.cache_path(filename, source_code)
     );
@@ -653,11 +674,13 @@ mod tests {
     let source_code = "1+2".as_bytes();
     let output_code = "1+2 // output code".as_bytes();
     let source_map = "{}".as_bytes();
+    let declaration = "".as_bytes();
     let hash = source_code_hash(filename, source_code, version::DENO);
-    let (cache_path, source_map_path) =
+    let (cache_path, source_map_path, declaration_path) =
       deno_dir.cache_path(filename, source_code);
     assert!(cache_path.ends_with(format!("gen/{}.js", hash)));
     assert!(source_map_path.ends_with(format!("gen/{}.js.map", hash)));
+    assert!(declaration_path.ends_with(format!("gen/{}.d.ts", hash)));
 
     let out = ModuleMetaData {
       filename: filename.to_owned(),
@@ -668,6 +691,8 @@ mod tests {
       maybe_output_code_filename: None,
       maybe_source_map: Some(source_map.to_owned()),
       maybe_source_map_filename: None,
+      maybe_declaration: Some(declaration.to_owned()),
+      maybe_declaration_filename: None,
     };
 
     let r = deno_dir.code_cache(&out);

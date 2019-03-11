@@ -206,3 +206,67 @@ pub fn print_file_info(
     }
   }
 }
+
+pub fn print_dep_types(
+  modules: &Modules,
+  deno_dir: &DenoDir,
+  filename: String,
+) {
+  let maybe_out = deno_dir.fetch_module_meta_data(&filename, ".");
+  if maybe_out.is_err() {
+    println!("{}", maybe_out.unwrap_err());
+    return;
+  }
+  let out = maybe_out.unwrap();
+  let dep_root = deno_dir.deps.to_str().unwrap();
+  let mut seen: HashSet<deno_mod> = HashSet::new();
+
+  let id = modules.get_id(&out.module_name).unwrap();
+  let deps = collect_deps(&mut seen, modules, id)
+    .into_iter()
+    .filter_map(|d| deno_dir.fetch_module_meta_data(&d, ".").ok())
+    .filter(|d| d.filename.starts_with(dep_root));
+
+  for d in deps {
+    println!("// {}", d.module_name);
+    match d.maybe_declaration {
+      None => println!("// no declaration"),
+      Some(decl) => {
+        let decl = String::from_utf8(decl).unwrap();
+        println!("declare module \"{}\" {{", d.module_name);
+        print!(
+          "{}",
+          decl
+            .replace("export declare ", "export ")
+            .replace("declare ", "")
+        );
+        println!("}}\n")
+      }
+    }
+  }
+}
+
+fn collect_deps(
+  seen: &mut HashSet<deno_mod>,
+  modules: &Modules,
+  id: deno_mod,
+) -> Vec<String> {
+  if seen.contains(&id) {
+    Vec::new()
+  } else {
+    seen.insert(id);
+    let mut deps: Vec<String> = modules
+      .get_children(id)
+      .unwrap()
+      .iter()
+      .enumerate()
+      .map(|(_index, dep_id)| collect_deps(seen, modules, *dep_id))
+      .flatten()
+      .collect();
+
+    let name = modules.get_name(id).unwrap().to_string();
+    deps.push(name);
+
+    deps
+  }
+}

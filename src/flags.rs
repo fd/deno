@@ -30,6 +30,7 @@ pub struct DenoFlags {
   pub allow_env: bool,
   pub allow_run: bool,
   pub types: bool,
+  pub dep_types: bool,
   pub prefetch: bool,
   pub info: bool,
   pub fmt: bool,
@@ -118,6 +119,9 @@ fn set_recognized_flags(
         if matches.opt_present("types") {
           flags.types = true;
         }
+        if matches.opt_present("dep-types") {
+          flags.dep_types = true;
+        }
         if matches.opt_present("prefetch") {
           flags.prefetch = true;
         }
@@ -163,6 +167,11 @@ pub fn set_flags(
   opts.optflag("r", "reload", "Reload cached remote resources");
   opts.optflag("", "v8-options", "Print V8 command line options");
   opts.optflag("", "types", "Print runtime TypeScript declarations");
+  opts.optflag(
+    "",
+    "dep-types",
+    "Print TypeScript declarations for the dependencies",
+  );
   opts.optflag("", "prefetch", "Prefetch the dependencies");
   opts.optflag("", "info", "Show source file related info");
   opts.optflag("", "fmt", "Format code");
@@ -287,6 +296,19 @@ fn test_set_flags_8() {
     flags,
     DenoFlags {
       allow_read: true,
+      ..DenoFlags::default()
+    }
+  )
+}
+
+#[test]
+fn test_set_flags_9() {
+  let (flags, rest, _) = set_flags(svec!["deno", "--dep-types"]).unwrap();
+  assert_eq!(rest, svec!["deno"]);
+  assert_eq!(
+    flags,
+    DenoFlags {
+      dep_types: true,
       ..DenoFlags::default()
     }
   )
